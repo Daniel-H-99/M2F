@@ -176,7 +176,6 @@ if __name__ == "__main__":
     parser.add_argument('--device_id', type=str, default='1')
 
     opt = parser.parse_args()
-    opt.vid_dir = opt.data_dir
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.device_id
 
@@ -184,14 +183,14 @@ if __name__ == "__main__":
 
     generator = load_checkpoints(config_path=opt.config, checkpoint_path=opt.checkpoint, cpu=opt.cpu)
     generator.module.dense_motion_network.prior_from_audio = False
-    dataset = get_dataset(opt.vid_dir)
+    dataset = get_dataset(opt.data_dir)
     predictions = make_animation(dataset['video'], dataset['driving_video'], dataset['mesh'], dataset['driving_mesh'], dataset['driving_mesh_img'], generator, cpu=opt.cpu)
-    os.makedirs(os.path.join(opt.vid_dir, 'demo_img'), exist_ok=True)
+    os.makedirs(os.path.join(opt.data_dir, 'demo_img'), exist_ok=True)
     for i, pred in tqdm(enumerate(predictions)):
-        cv2.imwrite(os.path.join(opt.vid_dir, 'demo_img', '{:05d}.png'.format(i + 1)), img_as_ubyte(pred)[:, :, [2, 1, 0]])
-    imageio.mimsave(os.path.join(opt.vid_dir, 'pre_' + opt.result_video), [img_as_ubyte(frame) for frame in predictions], fps=fps)
+        cv2.imwrite(os.path.join(opt.data_dir, 'demo_img', '{:05d}.png'.format(i + 1)), img_as_ubyte(pred)[:, :, [2, 1, 0]])
+    imageio.mimsave(os.path.join(opt.data_dir, 'pre_' + opt.result_video), [img_as_ubyte(frame) for frame in predictions], fps=fps)
     if opt.use_raw:
         audio_name = '_audio.wav'
     else:
         audio_name = 'audio.wav'
-    ffmpeg.output(ffmpeg.input(os.path.join(opt.vid_dir, 'pre_' + opt.result_video)), ffmpeg.input(os.path.join(opt.vid_dir, audio_name)), os.path.join(opt.vid_dir, opt.result_video)).overwrite_output().run()
+    ffmpeg.output(ffmpeg.input(os.path.join(opt.data_dir, 'pre_' + opt.result_video)), ffmpeg.input(os.path.join(opt.data_dir, audio_name)), os.path.join(opt.data_dir, opt.result_video)).overwrite_output().run()

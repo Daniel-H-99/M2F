@@ -1,7 +1,7 @@
 from torch import nn
 import torch.nn.functional as F
 import torch
-from modules.util import Hourglass, AntiAliasInterpolation2d, make_coordinate_grid, kp2gaussian, LIP_IDX, ROI_IDX, CONTOUR_IDX
+from modules.util import Hourglass, AntiAliasInterpolation2d, make_coordinate_grid, kp2gaussian, LEFT_EYE_IDX, RIGHT_EYE_IDX, LIP_IDX, ROI_IDX, CONTOUR_IDX
 
 class MeshDenseMotionNetwork(nn.Module):
     """
@@ -9,13 +9,12 @@ class MeshDenseMotionNetwork(nn.Module):
     """
 
     def __init__(self, block_expansion, num_blocks, max_features, num_kp, num_channels, estimate_occlusion_map=False,
-                 scale_factor=1, kp_variance=0.01):
+                 scale_factor=1):
         super(MeshDenseMotionNetwork, self).__init__()
         self.hourglass = Hourglass(block_expansion=block_expansion, in_features=1,
                                    max_features=max_features, num_blocks=num_blocks)
 
-        self.mask = nn.Conv2d(self.hourglass.out_filters, num_kp + 1, kernel_size=(7, 7), padding=(3, 3))
-
+        self.mask = nn.Conv2d(self.hourglass.out_filters, 3 + 1, kernel_size=(7, 7), padding=(3, 3))
         if estimate_occlusion_map:
             self.occlusion = nn.Conv2d(self.hourglass.out_filters, 1, kernel_size=(7, 7), padding=(3, 3))
         else:
@@ -23,9 +22,13 @@ class MeshDenseMotionNetwork(nn.Module):
 
         self.num_kp = num_kp
         self.scale_factor = scale_factor
-        self.kp_variance = kp_variance
 
-        self.motion_prior = nn.Linear(len(ROI_IDX) * 2, num_kp * 2)
+        self.segments = [LEFT_EYE_IDX, RIGHT_EYE_IDX, LIP_IDX]
+        self.num_priors = [5, 5, 10]
+
+        self.motion_prior = nn.ModuleList()
+        for i in range(len(self.segments)):
+            self.motion_prior.append(nn.Linear(len(self.segments[i]) * 2, self.num_priors[i] * 2))
 
         if self.scale_factor != 1:
             self.down = AntiAliasInterpolation2d(num_channels, self.scale_factor)
@@ -88,6 +91,26 @@ class MeshDenseMotionNetwork(nn.Module):
         denormalized = tmp.squeeze(5)  # B x K x H x W x 3
         return denormalized
 
+    def get_segment_priors(self, mesh):
+        priors = []
+        for i, extractor in enumerate(self.motion_prior):
+            segment = self.segments(i)
+            segment_prior = extractor(mesh[:, segment].flatten(start_dim=-2))
+            priors.append(segment_prior)
+        return torch.cat(priors, dim=1)
+
+    def get_segment_weights(self, input):
+        weights = []
+        prediction = self.hourglass(input)
+        mask = self.mask(prediction)
+        mask = F.softmax(mask, dim=1)   # B x 4 x H x 
+        weights.append(mask[:, [0]])
+        mask = mask[:, 1:]
+        for i, num_prior in enumerate(self.num_priors):
+            weigths.append(mask[:, [i]].repeat(1, num_prior, 1, 1))
+        weights = torch.cat(weights, dim=1) # B x num_kp x H x W
+        return weights
+
     def forward(self, source_image, kp_driving, kp_source, driving_mesh_image=None):
         if self.scale_factor != 1:
             source_image = self.down(source_image)
@@ -96,17 +119,15 @@ class MeshDenseMotionNetwork(nn.Module):
 
         out_dict = dict()
     
-        v_driving = self.motion_prior(kp_driving['value'].flatten(start_dim=-2)).view(bs, -1, 2)
-        v_source = self.motion_prior(kp_source['value'].flatten(start_dim=-2)).view(bs, -1, 2)
+        v_driving = self.get_segment_priors(kp_driving['value']).view(bs, -1, 2)
+        v_source = self.get_segment_priors(kp_source['value']).view(bs, -1, 2)
+
         kp_driving['value'] = v_source - v_driving
         
         sparse_motion = self.create_sparse_motions(source_image, kp_driving, kp_source)
 
         input = driving_mesh_image[:, [0]]
-        prediction = self.hourglass(input)
-
-        mask = self.mask(prediction)
-        mask = F.softmax(mask, dim=1)
+        mask = self.get_segment_weights(input)
         out_dict['mask'] = mask
         mask = mask.unsqueeze(2)
         sparse_motion = sparse_motion.permute(0, 1, 4, 2, 3)

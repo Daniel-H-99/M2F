@@ -313,7 +313,7 @@ def interpolate_z(mesh, image_rows=256, image_cols=256):
   Z = interp(X, Y)
   return torch.from_numpy(Z) # image_rows x image_cols x 1
 
-def draw_mesh_images(mesh_dir, save_dir, image_rows, image_cols):
+def draw_mesh_images(mesh_dir, save_dir, image_rows=256, image_cols=256):
     mesh_filename_list = get_file_list(mesh_dir)
     os.makedirs(save_dir, exist_ok=True)
     for mesh_filename in tqdm(mesh_filename_list):

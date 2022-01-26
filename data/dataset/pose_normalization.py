@@ -10,7 +10,7 @@ import math
 from tqdm import tqdm
 import torch
 import util
-from util import get_file_list, landmark_to_dict, interpolate_zs, interpolate_z, normalize_meshes, normalize_mesh, landmarkdict_to_mesh_tensor, draw_mesh_images
+from util import get_file_list, landmark_to_dict, interpolate_zs, interpolate_z, normalize_meshes, normalize_mesh, landmarkdict_to_mesh_tensor, draw_mesh_images, construct_stack
 import numpy as np
 import cv2
 import mediapipe as mp
@@ -211,6 +211,7 @@ def pose_normalization(args):
     torch.save(reference_dict, os.path.join(data_dir, 'mesh_dict_reference.pt'))
     torch.save(normalize_mesh(reference_dict), os.path.join(data_dir, 'mesh_dict_reference_normalized.pt'))
     torch.save(interpolate_z(landmarkdict_to_mesh_tensor(normalize_mesh(reference_dict))), os.path.join(data_dir, 'z_reference_normalized.pt'))
+    draw_mesh_image(reference_dict, os.path.join(data_dir, 'mesh_image_reference.png'), 256, 256)
 
     data_dirs = []
     reference_dicts = []
@@ -272,6 +273,8 @@ if __name__ == '__main__':
     create_dirs(args)
     num_frames, num_errors = pose_normalization(args)
     normalize_meshes(os.path.join(data_dir, 'mesh_dict'), os.path.join(data_dir, 'mesh_dict_normalized'))
+    normalized_mesh_stack = construct_stack(data_dir, include_audio=False)
+    torch.save(normalized_mesh_stack, os.path.join(data_dir, 'mesh_stack.pt'))
 
     if args.draw_mesh:
         draw_mesh_images(os.path.join(data_dir, 'mesh_dict'), os.path.join(data_dir, 'mesh_image'), 256, 256)

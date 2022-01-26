@@ -13,7 +13,7 @@ import glob
 import random
 import pickle as pkl
 from datetime import datetime
-import util
+import utils.util as util
 
 def read_video(name, frame_shape):
     """
@@ -124,7 +124,6 @@ class MeshFramesDataset(Dataset):
         normed_z_array = [torch.load(os.path.join(path, 'z_normalized', frames[frame_idx[i]].replace('.png', '.pt'))) for i in range(len(frame_idx))]
         video_array = [img_as_float32(io.imread(os.path.join(path, 'img', frames[frame_idx[i]]))) for i in range(len(frame_idx))]
         mesh_img_array = [img_as_float32(io.imread(os.path.join(path, 'mesh_image', frames[frame_idx[i]]))) for i in range(len(frame_idx))]
-        lip_mask_array = [get_lip_mask(torch.load(os.path.join(path, 'mesh_dict', frames[idx].replace('.png', '.pt'))), (256, 256, 3)) for idx in frame_idx]
 
         R_array.append(R_array[1])
         t_array.append(t_array[1])
@@ -135,7 +134,6 @@ class MeshFramesDataset(Dataset):
         mesh_img_array.append(mesh_img_array[1])
         z_array.append(z_array[1])
         normed_z_array.append(normed_z_array[1])
-        lip_mask_array.append(lip_mask_array[1])
 
         if self.transform is not None:
             video_array, mesh_array, R_array, t_array, c_array, mesh_img_array = self.transform(video_array, mesh_array, R_array, t_array, c_array, mesh_img_array)

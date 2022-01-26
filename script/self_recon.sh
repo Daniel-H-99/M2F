@@ -1,2 +1,2 @@
-python inference.py --data_dir data/sonny/test.mp4 --use_raw
-python data/dataset/paste_patch.py --data_dir data/sonny/test.mp4 --patch_dir demo_img
+python inference.py --data_dir data/tmp/test.mp4 --use_raw --checkpoint '/home/server25/minyeong_workspace/M2F/log/kkj-256 25_01_22_05.54.42/00000079-checkpoint.pth.tar'
+python data/dataset/paste_patch.py --data_dir data/tmp/test.mp4 --patch_dir demo_img

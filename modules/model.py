@@ -227,7 +227,7 @@ class MeshGeneratorFullModel(torch.nn.Module):
     def preprocess_mesh(self, mesh):
         roi = ROI_IDX
         res = mesh
-        res['value'] = mesh['normed_mesh'][:, roi, :2]
+        res['value'] = mesh['normed_mesh'][:, :, :2]
         # res['jacobian'] = (mesh['R'].inverse()[:, :2, :2] / mesh['c'].unsqueeze(1).unsqueeze(2)).unsqueeze(1).repeat(1, res['value'].size(1), 1, 1)
 
         # print("jacobian shape: {}".format(res['jacobian'].shape))
