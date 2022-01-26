@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", default='config/kkj-256.yaml', help="path to config")
     parser.add_argument("--checkpoint", default='log/sonny/last.tar', help="path to checkpoint to restore")
-    parser.add_argument("--data_dir", default='data/sonny/test.mp4', help="video directory")
+    parser.add_argument("--data_dir", default='data/test/test.mp4', help="video directory")
     parser.add_argument("--result_video", default='recon.mp4', help="path to output")
     parser.add_argument("--cpu", dest="cpu", action="store_true", help="cpu mode.")
     parser.add_argument("--use_raw", action="store_true", help="use raw dataset")

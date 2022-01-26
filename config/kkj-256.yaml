@@ -1,6 +1,6 @@
 
 dataset_params:
-  root_dir: data/sonny/train.mp4
+  root_dir: data/train
   frame_shape: [256, 256, 3]
   id_sampling: False
   pairs_list: data/vox256.csv

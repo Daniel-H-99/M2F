@@ -1,13 +1,14 @@
 src_dir=data/data_raw
 tgt_dir=data/data_preprocessed
-
+home_dir=~/home/minyeong_workspace/M2F
 # start_time="00:00:11"
 # end_time="00:10:00"
 
 echo 'image cropping...'
 
+cd $home_dir/$src_dir
 
-for file in $src_dir/*.mp4
+for file in *.mp4
 do
     mkdir -p $home/$tgt_dir/$file
     mkdir -p $home/$tgt_dir/$file/full
@@ -23,6 +24,7 @@ do
     mv $home/$tgt_dir/$file/crop $home/$tgt_dir/$file/img
 done
 
+cd $home_dir
 
 echo 'pose normalizing...'
 for file in $tgt_dir/*.mp4
