@@ -16,7 +16,7 @@ do
     rm -rf $home/$tgt_dir/$file/img
     ffmpeg -hide_banner -y -i $file -filter:v "crop=540:540:360:0,scale=520x520" -r 25 $home/$tgt_dir/$file/full/%05d.png
     # ffmpeg -hide_banner -y -ss $start_time -t $end_time -i $file -filter:v "crop=540:540:360:0,scale=520x520" -r 25 $home/$tgt_dir/$file/full/%05d.png
-    CUDA_VISIBLE_DEVICES=1 python $home/data/dataset/crop_portrait.py --data_dir $home/$tgt_dir/$file --crop_level 1.5 --vertical_adjust -0.2 --dest_size 256
+    CUDA_VISIBLE_DEVICES=3 python $home/data/dataset/crop_portrait.py --data_dir $home/$tgt_dir/$file --crop_level 1.5 --vertical_adjust -0.2 --dest_size 256
     ffmpeg -loglevel panic -y  -i $file  -strict -2 $home/$tgt_dir/$file/audio.wav
     ffmpeg -loglevel panic -y  -ss $start_time -i $file -t $end_time -strict -2 $home/$tgt_dir/$file/audio.wav
     cp $home/$tgt_dir/$file/audio.wav $home/$tgt_dir/$file/_audio.wav

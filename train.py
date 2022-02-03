@@ -101,7 +101,7 @@ if __name__ == "__main__":
     if sys.version_info[0] < 3:
         raise Exception("You must use Python 3 or higher. Recommended version is Python 3.7")
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     parser = ArgumentParser()
     parser.add_argument("--config", default='config/kkj-256.yaml', help="path to config")
     parser.add_argument("--log_dir", default='log', help="path to log into")

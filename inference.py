@@ -165,7 +165,7 @@ def make_animation(source_video, driving_video, source_mesh, driving_mesh, drivi
     return predictions
 
 if __name__ == "__main__":
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     parser = ArgumentParser()
     parser.add_argument("--config", default='config/kkj-256.yaml', help="path to config")
     parser.add_argument("--checkpoint", default='log/sonny/last.tar', help="path to checkpoint to restore")
