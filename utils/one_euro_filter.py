@@ -1,4 +1,5 @@
 import math
+import numpy as np
 
 
 def smoothing_factor(t_e, cutoff):
@@ -8,6 +9,36 @@ def smoothing_factor(t_e, cutoff):
 
 def exponential_smoothing(a, x, x_prev):
     return a * x + (1 - a) * x_prev
+
+
+def applyFilter(points, t, min_cutoff, beta, skipPoints = []):
+    filtered = np.empty_like(points)
+    filtered[0] = points[0]
+    one_euro_filter = OneEuroFilter(t[0], points[0], min_cutoff=min_cutoff, beta=beta)
+    
+    for i in range(1, points.shape[0]):
+        filtered[i] = one_euro_filter(t[i], points[i])
+        
+    for i in range(1, points.shape[0]):
+        for skipPoint in skipPoints:
+            filtered[i, skipPoint] = points[i, skipPoint]
+
+    return filtered
+
+
+def applyFilterOnMesh(landmarks):
+    shape_1, shape_2, shape_3 = landmarks.shape
+    xs = landmarks[:,:,0].reshape((shape_1, shape_2))
+    ys = landmarks[:,:,1].reshape((shape_1, shape_2))
+    zs = landmarks[:,:,2].reshape((shape_1, shape_2))
+    t = np.linspace(0, xs.shape[0] / 25, xs.shape[0])
+    xs_hat = applyFilter(xs, t, 0.005, 0.7)
+    ys_hat = applyFilter(ys, t, 0.005, 0.7, mouthPoints + chins)
+    ys_hat = applyFilter(ys_hat, t, 0.000001, 1.5, rest)
+    zs_hat = applyFilter(zs, t, 0.005, 0.7)
+    combine = np.stack(((xs_hat, ys_hat, zs_hat)), axis=2)
+
+    return combine
 
 
 class OneEuroFilter:

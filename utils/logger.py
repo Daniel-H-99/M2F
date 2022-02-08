@@ -135,6 +135,22 @@ class Visualizer:
                 out.append(self.create_image_column(arg))
         return np.concatenate(out, axis=1)
 
+    def visualize_segment(self, mesh_image, deformation):
+        # mesh_image: H x W x 3
+        # deformation: H x W x num_seg
+        img = np.zeros_like(mesh_image)
+        num_seg = deformation.shape[2]
+        for i in range(num_seg):
+            if i != 0:
+                color = np.array(self.colormap((i - 1) / (num_seg - 1)))[:3]
+            else:
+                color = np.array((0, 0, 0))
+            img += color[None, None] * deformation[:, :, [i]] # H x W x C
+        
+        # img = np.stack([img, mesh_image], axis=0).max(axis=0) # H x W x C
+        img = (255 * img).astype(np.uint8)
+        return img
+
     def visualize(self, driving, source, out):
             images = []
 

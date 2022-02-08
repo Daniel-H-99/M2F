@@ -16,6 +16,7 @@ from sync_batchnorm import DataParallelWithCallback
 
 from modules.generator import MeshOcclusionAwareGenerator
 from utils.util import mesh_tensor_to_landmarkdict, draw_mesh_images, interpolate_zs, mix_mesh_tensor, LIP_IDX, ROI_IDX, MASK_IDX, WIDE_MASK_IDX, get_lip_mask, init_dir
+from utils.one_euro_filter import OneEuroFilter
 
 from scipy.spatial import ConvexHull
 import os
@@ -23,12 +24,21 @@ import shutil
 import ffmpeg
 import cv2
 import pickle as pkl
+from utils.logger import Visualizer
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 if sys.version_info[0] < 3:
     raise Exception("You must use Python 3 or higher. Recommended version is Python 3.7")
+
+    # xs_hat = applyFilter(xs, t, 0.005, 0.7)
+    # ys_hat = applyFilter(ys, t, 0.005, 0.7, mouthPoints + chins)
+    # ys_hat = applyFilter(ys_hat, t, 0.000001, 1.5, rest)
+    # zs_hat = applyFilter(zs, t, 0.005, 0.7)
+
+MIN_CUTOFF = 0.005
+BETA = 0.7
 
 def preprocess_mesh(m, frame_idx):
     roi = ROI_IDX
@@ -40,7 +50,7 @@ def preprocess_mesh(m, frame_idx):
     if 'normed_roi' in res:
         res['mesh'][:, roi] = res['normed_roi']
         res['normed_mesh'][:, roi] = res['normed_roi']
-    res['value'] = res['normed_mesh'][:, roi, :2]
+    res['value'] = res['normed_mesh'][:, :, :2]
 
     return res
 
@@ -137,6 +147,10 @@ def get_dataset(path):
     return out
 
 def make_animation(source_video, driving_video, source_mesh, driving_mesh, driving_mesh_img, generator, cpu=False):
+    visualizer = Visualizer(kp_size=4)
+    num_frames = driving_video.shape[1]
+    fps = 25
+    times = np.linspace(0, num_frames / fps, num_frames)
     with torch.no_grad():
         source = torch.tensor(np.array(source_video)[np.newaxis].astype(np.float32))
         driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32))
@@ -159,16 +173,18 @@ def make_animation(source_video, driving_video, source_mesh, driving_mesh, drivi
                 # kp_source['value'] = kp_source['value'].cuda()
 
             out = generator(source_frame, kp_source=kp_source, kp_driving=kp_driving, driving_mesh_image=driving_mesh_frame, driving_image=driving_frame)
-            normed_mesh.append(kp_driving['normed_mesh'])
 
             driving_mesh_pos = kp_driving['mesh'].cuda()[:, :, None, :2] # B x K x 1 x 2
             driving_mesh_normalized_pos = kp_driving['normed_mesh'].cuda()[:, :]
+            # motion = kp_driving['mesh'].cuda()
             motion = kp_driving['driving_normed_mesh'].cuda()
             motion[:, :, :2] = F.grid_sample(out['deformation'].permute(0, 3, 1, 2), driving_mesh_pos).squeeze(3).permute(0, 2, 1)   # B x K x 2
             motion[:, :, 2] = driving_mesh_normalized_pos[:, :, 2]
+
+
             # motion[LIP_IDX] = kp_driving['normed_lip']
-            searched_mesh.append(motion)
             filename = '{:05d}.pt'.format(frame_idx + 1)
+
             R = kp_driving['driving_R'][0].cuda()
             RT = R.transpose(0, 1)
             t = kp_driving['driving_t'][0].cuda()
@@ -181,6 +197,7 @@ def make_animation(source_video, driving_video, source_mesh, driving_mesh, drivi
             # normalized_base = 128 * (kp_driving['normed_mesh'][0] + 1)
             # base = 128 * (kp_driving['mesh'][0] + 1)
             geometry = 128 * (motion.view(-1, 3) + 1)
+
             normalised_geometry = geometry.clone().detach().cpu()
             # normalised_geometry = mix_mesh_tensor(normalised_geometry, normalized_base.cpu())
             normalised_landmark_dict = mesh_tensor_to_landmarkdict(normalised_geometry)
@@ -190,14 +207,35 @@ def make_animation(source_video, driving_video, source_mesh, driving_mesh, drivi
             # mix with original geometry
             _geometry = kp_driving['driving_mesh'][0].cpu()
             _geometry[:] = geometry[:]
-            geomtery = _geometry
+            geometry = _geometry
+
+            geometry = geometry.numpy()
+            x = geometry[:, 0]
+            y = geometry[:, 1]
+            z = geometry[:, 2]
+
+            if frame_idx == 0:
+                x_filter = OneEuroFilter(times[0], x[0], min_cutoff=MIN_CUTOFF, beta=BETA)
+                y_filter = OneEuroFilter(times[0], y[0], min_cutoff=MIN_CUTOFF, beta=BETA)
+                z_filter = OneEuroFilter(times[0], z[0], min_cutoff=MIN_CUTOFF, beta=BETA)
+            else:
+                x = x_filter(times[frame_idx], x)
+                y = y_filter(times[frame_idx], y)
+                z = z_filter(times[frame_idx], z)
+
+            geometry = torch.from_numpy(np.stack([x, y, z], axis=1))
+
             # geometry = mix_mesh_tensor(geometry, base.cpu())
             landmark_dict = mesh_tensor_to_landmarkdict(geometry)
             landmark_dict.update({'R': R.cpu().numpy(), 't': t.cpu().numpy(), 'c': c.cpu().numpy()})
             torch.save(normalised_landmark_dict, os.path.join(opt.data_dir,'mesh_dict_searched_normalized',filename))
             torch.save(landmark_dict, os.path.join(opt.data_dir, 'mesh_dict_searched', filename))
-            
-    return searched_mesh, normed_mesh
+
+            driving_mesh_frame = driving_mesh_frame[0].permute(1, 2, 0).detach().cpu().numpy()
+            deformation = out['mask'][0].permute(1, 2, 0).detach().cpu().numpy()
+            seg_img = visualizer.visualize_segment(driving_mesh_frame, deformation)
+            imageio.imsave(os.path.join(opt.data_dir, 'seg_image', '{:05d}.png'.format(frame_idx + 1)), seg_img)
+
 
 def save_searched_mesh(searched_mesh_batch, save_dir):
     # searched_mesh_batch: L x N * 3
@@ -226,14 +264,9 @@ if __name__ == "__main__":
 
     init_dir(os.path.join(opt.data_dir, 'mesh_dict_searched'))
     init_dir(os.path.join(opt.data_dir, 'mesh_dict_searched_normalized'))
+    init_dir(os.path.join(opt.data_dir, 'seg_image'))
 
-
-    searched_mesh, normed_mesh = make_animation(dataset['video'], dataset['video'], dataset['mesh'], dataset['driving_mesh'], dataset['driving_mesh_img'], generator, cpu=opt.cpu)
-    searched_mesh = torch.cat(searched_mesh, dim=0)
-    normed_mesh = torch.cat(normed_mesh, dim=0)
-    eval_loss = 100 * F.l1_loss(searched_mesh.flatten(start_dim=-2), normed_mesh.flatten(start_dim=-2))
-
-    print('eval loss: {}'.format(eval_loss))
+    make_animation(dataset['video'], dataset['video'], dataset['mesh'], dataset['driving_mesh'], dataset['driving_mesh_img'], generator, cpu=opt.cpu)
 
     image_rows = image_cols = 256
     draw_mesh_images(os.path.join(opt.data_dir, 'mesh_dict_searched_normalized'), os.path.join(opt.data_dir, 'mesh_image_searched_normalized'), image_rows, image_cols)

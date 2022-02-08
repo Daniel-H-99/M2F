@@ -28,7 +28,7 @@ def preprocess_mesh(m, frame_idx):
     res = m.copy()
     for key in res.keys():
         res[key] = torch.tensor(res[key][frame_idx])[None].float().cuda()
-    res['value'] = res['normed_mesh'][:, roi, :2]
+    res['value'] = res['normed_mesh'][:, :, :2]
     return res
 
 def load_checkpoints(config_path, checkpoint_path, cpu=False):
@@ -57,7 +57,6 @@ def load_checkpoints(config_path, checkpoint_path, cpu=False):
     return generator
 
 def get_dataset(path):
-    roi_list = [0, 267, 13, 14, 269, 270, 17, 146, 402, 405, 409, 415, 37, 39, 40, 178, 181, 310, 311, 312, 185, 314, 317, 61, 191, 318, 321, 324, 78, 80, 81, 82, 84, 87, 88, 91, 95, 375]
     video_name = os.path.basename(path)
     frames = sorted(os.listdir(os.path.join(path, 'img')))
     num_frames = len(frames) if opt.use_raw else len(os.listdir(os.path.join(path, 'mesh_dict_searched')))
@@ -95,7 +94,6 @@ def get_dataset(path):
         driving_t_array = [np.array(torch.load(os.path.join(path, mesh_dict, frames[idx].replace('.png', '.pt')))['t']) for idx in frame_idx]
         driving_c_array = [np.array(torch.load(os.path.join(path, mesh_dict, frames[idx].replace('.png', '.pt')))['c']) for idx in frame_idx]
         lip_mask_array = [get_lip_mask(torch.load(os.path.join(path, mesh_dict, frames[idx].replace('.png', '.pt'))), (256, 256, 3)) for idx in frame_idx]
-
     else:
         mesh_dict = 'mesh_dict_searched'
         normed_mesh_dict = 'mesh_dict_searched_normalized'
@@ -165,7 +163,7 @@ def make_animation(source_video, driving_video, source_mesh, driving_mesh, drivi
     return predictions
 
 if __name__ == "__main__":
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     parser = ArgumentParser()
     parser.add_argument("--config", default='config/kkj-256.yaml', help="path to config")
     parser.add_argument("--checkpoint", default='log/sonny/last.tar', help="path to checkpoint to restore")

@@ -42,10 +42,15 @@ def get_mapping_function(roi_pool, roi_drving_pool):
     # roi_pool: P x roi_dim
     # roi_driving_pool: P' x roi_dim
     # all normalized by [-1, 1]
-    tgt_max, tgt_min = roi_pool.max(dim=0)[0], roi_pool.min(dim=0)[0]
-    src_max, src_min = roi_driving_pool.max(dim=0)[0], roi_driving_pool.min(dim=0)[0]
-    A = (tgt_max - tgt_min) / (src_max - src_min).clamp(min=1e-6)
-    B = tgt_min - A * src_min
+
+    A = torch.ones_like(roi_pool[0])
+    B = torch.zeros_like(roi_pool[0])
+
+    # tgt_max, tgt_min = roi_pool.max(dim=0)[0], roi_pool.min(dim=0)[0]
+    # src_max, src_min = roi_driving_pool.max(dim=0)[0], roi_driving_pool.min(dim=0)[0]
+    # A = (tgt_max - tgt_min) / (src_max - src_min).clamp(min=1e-6)
+    # B = tgt_min - A * src_min
+
     # var, mean = torch.var_mean(roi_pool, dim=0, unbiased=False)
     # var *= 3
     # var_driving, mean_driving = torch.var_mean(roi_driving_pool, dim=0, unbiased=True)
